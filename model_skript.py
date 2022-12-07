@@ -11,8 +11,13 @@ Die Bezugsgröße ist 1 MW
 import pypsa
 import pandas as pd
 
+# - - - Error Fixes - - - -
+import subprocess
+#ret = subprocess.run(["dir", "/p"], shell=True)
+
 # - - - Settings - - - -
 SNAPSHOTS = 8760 #no of hours of 1 year
+USE_BATTERY = True
 
 # - - - Parameters - - - -
 ELECTROLYSIS_EFFICIENCY = 0.7
@@ -24,12 +29,13 @@ PV_CAPITAL_COST = 648e3 # $/MW
 WIND_CAPITAL_COST = 1e3 # €/MW
 
 # - - - Data Imports - - - -
-wind_data = pd.read_csv('data/tampico_wind.csv', skiprows=3)
-pv_data = pd.read_csv('data/tampico_pv.csv', skiprows=3)
+wind_data = pd.read_csv('data/tampico_wind.csv', skiprows=3)['electricity']
+pv_data = pd.read_csv('data/tampico_pv.csv', skiprows=3)['electricity']
+demand_data = pd.read_csv('data/transport_demand_test.csv')['0']
 
 # - - - Modell Deklaration - - - -
 net = pypsa.Network()
-net.set_snapshots(SNAPSHOTS)
+net.set_snapshots(range(SNAPSHOTS))
 
 # - - - Komponenten hinzufügen - - -
 
@@ -39,9 +45,19 @@ net.add('Bus', 'hydrogen')
 net.add('Link', 'electrolysis', bus0 = 'electrical', bus1 = 'hydrogen', efficiency=ELECTROLYSIS_EFFICIENCY,
         p_nom_extendable=True, capital_cost=ELECTROLYSIS_CAPITAL_COST, marginal_cost=ELECTROLYSIS_MARGINAL_COST)
 
-net.add('Generator', 'PV', 'electrical', marginal_cost=0, capital_cost=PV_CAPITAL_COST, p_nom_extendable=True,
+net.add('Generator', 'PV', bus='electrical', marginal_cost=0, capital_cost=PV_CAPITAL_COST, p_nom_extendable=True,
         p_max_pu=pv_data)
-net.add('Generator', 'Wind', 'electrical', marginal_cost=0, capital_cost=WIND_CAPITAL_COST, p_nom_extendable=True,
+net.add('Generator', 'Wind', bus='electrical', marginal_cost=0, capital_cost=WIND_CAPITAL_COST, p_nom_extendable=True,
         p_max_pu=wind_data)
 
+net.add('Load', 'Hydrogen Transport', bus='hydrogen', p_set=demand_data)
 
+net.add('Store', 'Hydrogen Storage', bus='hydrogen', e_nom_extendable=True)
+
+if USE_BATTERY:
+        net.add('Store', 'Battery', bus='electrical', e_nom_extendable=True)
+
+# - - - - - SOLVE MODEL - - - - - -
+net.lopf()
+print('Finished simulation!')
+net.generators.p.plot
