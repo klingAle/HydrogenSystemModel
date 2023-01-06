@@ -20,9 +20,6 @@ import subprocess
 SNAPSHOTS = 8760 #no of hours of 1 year
 USE_BATTERY = True
 
-ELECTROLYSIS_MAX_POWER = 100e9
-PV_MAX_POWER = 100e9
-
 # - - - Parameters - - - -
 ELECTROLYSIS_EFFICIENCY = 0.7
 ELECTROLYSIS_CAPITAL_COST = 500e3 # €/MW
@@ -49,10 +46,10 @@ net.add('Bus', 'electrical')
 net.add('Bus', 'hydrogen')
 
 net.add('Link', 'electrolysis', bus0 = 'electrical', bus1 = 'hydrogen', efficiency=ELECTROLYSIS_EFFICIENCY,
-        p_nom_extendable=True, p_nom_max = ELECTROLYSIS_MAX_POWER, capital_cost=ELECTROLYSIS_CAPITAL_COST, marginal_cost=ELECTROLYSIS_MARGINAL_COST)
+        p_nom_extendable=True, p_nom_max = 100e3, capital_cost=ELECTROLYSIS_CAPITAL_COST, marginal_cost=ELECTROLYSIS_MARGINAL_COST)
 
 net.add('Generator', 'PV', bus='electrical', marginal_cost=0, capital_cost=PV_CAPITAL_COST, p_nom_extendable=True,
-        p_nom_max = PV_MAX_POWER, p_max_pu=pv_data)
+        p_nom_max = 100e3, p_max_pu=pv_data)
 net.add('Generator', 'Wind', bus='electrical', marginal_cost=0, capital_cost=WIND_CAPITAL_COST, p_nom_extendable=True,
         p_max_pu=wind_data)
 
@@ -71,28 +68,12 @@ print('Finished simulation!')
 net.generators_t.p.plot()
 net.stores_t.e.plot()
 
-#print(net.stores,net.links, net.generators)
-
-# - - - Cost Calculation - - - - -
-capital_costs_generation = net.generators.capital_cost*net.generators.p_nom_opt
-capital_costs_storage = net.stores.capital_cost*net.stores.e_nom_opt
-capital_costs_links = net.links.capital_cost*net.links.p_nom_opt
-capital_costs_total = pd.Series(dtype='float64').append(capital_costs_links).append(capital_costs_generation)\
-        .append(capital_costs_storage)
+print(net.stores,net.links, net.generators)
 
 
+'''fig, axes = plt.subplots(2)
+net.links_t.'''
 
-capital_costs_total_billion = capital_costs_total*1e-9
-
-installed_power_generation = net.generators.p_nom_opt
-installed_power_electrolysis = net.links.p_nom_opt
-installed_capacity = net.stores.e_nom_opt
-
-print('Installed Generation Power in MW:\n', installed_power_generation)
-print('\nInstalled Electrolysis Power:\n', installed_power_electrolysis)
-print('\nInstalled Storage Capacity:\n', installed_capacity)
-
-print('Capital Costs in Billion €:\n', capital_costs_total_billion,'\nTotal:\n',capital_costs_total_billion.sum())
 
 plt.show()
 
