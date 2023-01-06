@@ -9,23 +9,22 @@ HEIZWERT_H2_kWh = 39.39  # kWh/kg
 
 
 # - - - - Demand Settings - - -
-ship_capacity_m3 = 140000  # m^3
+container_capacity = 1100  # kg
 
-liquid_h2_volume_to_kg = 0.7
+no_of_containers_per_transport = 1800 #350
 
-ship_capacity_kg = ship_capacity_m3*liquid_h2_volume_to_kg
+#no_of_pumps = 8
+#pump_capacity = 2000  # m^3/h
 
-no_of_pumps = 8
-pump_capacity = 2000  # m^3/h
+total_hydrogen_per_transport = container_capacity*no_of_containers_per_transport
+loading_time = 12 # hours
 
-loading_flow_m3 = pump_capacity*no_of_pumps
-loading_flow_kg = loading_flow_m3*liquid_h2_volume_to_kg
-loading_time = round(ship_capacity_m3/loading_flow_m3)
+hydrogen_loading_mass_flow = total_hydrogen_per_transport/loading_time # kg/hour
 
-power_flow_h2_MW = loading_flow_kg*HEIZWERT_H2_kWh/1000
+power_flow_h2_MW = hydrogen_loading_mass_flow*HEIZWERT_H2_kWh/1000
 
 
-loading_interval_days = 16
+loading_interval_days = 30 #7
 
 start_day = 3
 start_hour = start_day*24
@@ -39,9 +38,9 @@ for loading_start_time in np.arange(start_hour, 8760, loading_interval_days*24):
         print(load)
 plt.plot(load)
 load = pd.Series(load)
-plt.show()
-print(load)
-#load.to_csv('data/transport_demand_container_MW.csv')
 
 total_energy = sum(load)
 print('Total Energy: {}'.format(total_energy))
+plt.show()
+print(load)
+load.to_csv('data/transport_demand_container_MW_monthly.csv')

@@ -20,6 +20,10 @@ import subprocess
 SNAPSHOTS = 8760 #no of hours of 1 year
 USE_BATTERY = True
 
+ELECTROLYSIS_MAX_POWER = 100e9
+PV_MAX_POWER = 100e9
+
+
 # - - - Parameters - - - -
 ELECTROLYSIS_EFFICIENCY = 0.7
 ELECTROLYSIS_CAPITAL_COST = 500e3 # €/MW
@@ -34,8 +38,9 @@ HYDROGEN_STORE_CAPITAL_COST = 2700 # €/MWh
 # - - - Data Imports - - - -
 wind_data = pd.read_csv('data/tampico_wind.csv', skiprows=3)['electricity']
 pv_data = pd.read_csv('data/tampico_pv.csv', skiprows=3)['electricity']
-demand_data = pd.read_csv('data/transport_demand_test.csv')['0']
-
+#demand_data = pd.read_csv('data/transport_demand_test_MW.csv')['0']
+demand_data = pd.read_csv('data/transport_demand_container_MW.csv')['0']
+#demand_data = pd.read_csv('data/transport_demand_container_MW_monthly.csv')['0']
 # - - - Modell Deklaration - - - -
 net = pypsa.Network()
 net.set_snapshots(range(SNAPSHOTS))
@@ -46,10 +51,11 @@ net.add('Bus', 'electrical')
 net.add('Bus', 'hydrogen')
 
 net.add('Link', 'electrolysis', bus0 = 'electrical', bus1 = 'hydrogen', efficiency=ELECTROLYSIS_EFFICIENCY,
-        p_nom_extendable=True, p_nom_max = 100e3, capital_cost=ELECTROLYSIS_CAPITAL_COST, marginal_cost=ELECTROLYSIS_MARGINAL_COST)
+        p_nom_extendable=True, p_nom_max = ELECTROLYSIS_MAX_POWER, capital_cost=ELECTROLYSIS_CAPITAL_COST,
+        marginal_cost=ELECTROLYSIS_MARGINAL_COST)
 
 net.add('Generator', 'PV', bus='electrical', marginal_cost=0, capital_cost=PV_CAPITAL_COST, p_nom_extendable=True,
-        p_nom_max = 100e3, p_max_pu=pv_data)
+        p_nom_max = PV_MAX_POWER, p_max_pu=pv_data)
 net.add('Generator', 'Wind', bus='electrical', marginal_cost=0, capital_cost=WIND_CAPITAL_COST, p_nom_extendable=True,
         p_max_pu=wind_data)
 
@@ -66,15 +72,34 @@ print('start optimization')
 net.lopf(pyomo=False, solver_name='gurobi')
 print('Finished simulation!')
 net.generators_t.p.plot()
-net.stores_t.e.plot()
-
-print(net.stores,net.links, net.generators)
-
-
-'''fig, axes = plt.subplots(2)
-net.links_t.'''
-
-
 plt.show()
+net.stores_t.e['Hydrogen Storage'].plot()
+plt.show()
+net.stores_t.e['Battery'].plot()
+plt.show()
+#net.links_t.plot()
+
+
+# - - - Cost Calculation - - - - -
+capital_costs_generation = net.generators.capital_cost*net.generators.p_nom_opt
+capital_costs_storage = net.stores.capital_cost*net.stores.e_nom_opt
+capital_costs_links = net.links.capital_cost*net.links.p_nom_opt
+capital_costs_total = pd.Series(dtype='float64').append(capital_costs_links).append(capital_costs_generation)\
+        .append(capital_costs_storage)
+
+
+
+capital_costs_total_million = capital_costs_total*1e-6
+
+installed_power_generation = net.generators.p_nom_opt
+installed_power_electrolysis = net.links.p_nom_opt
+installed_capacity = net.stores.e_nom_opt
+
+print('Installed Generation Power in MW:\n', installed_power_generation)
+print('\nInstalled Electrolysis Power:\n', installed_power_electrolysis)
+print('\nInstalled Storage Capacity:\n', installed_capacity)
+
+print('Capital Costs in Million €:\n', capital_costs_total_million,'\nTotal:\n',capital_costs_total_million.sum())
+
 
 
